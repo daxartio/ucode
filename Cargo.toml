@@ -20,5 +20,5 @@ serde_json = "1.0.108"
 
 [[bin]]
 path = "src/main.rs"
-name = "ucode-cli"
+name = "ucode"
 
