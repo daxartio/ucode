@@ -1,10 +1,14 @@
 use std::error::Error;
 
-use lsp_types::request::Completion;
-use lsp_types::{CompletionItemKind, CompletionOptions, CompletionResponse};
+use lsp_types::notification::{DidOpenTextDocument, Notification as _};
+use lsp_types::request::{Completion, GotoDefinition, Request as _};
+use lsp_types::{CompletionOptions, CompletionResponse, GotoDefinitionResponse, OneOf};
 use lsp_types::{InitializeParams, ServerCapabilities};
 
-use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
+use lsp_server::{Connection, ErrorCode, ExtractError, Message, Request, RequestId, Response};
+
+mod date;
+mod snippets;
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Note that  we must have our logging only write out to stderr.
@@ -17,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
         completion_provider: Some(CompletionOptions::default()),
-        // definition_provider: Some(OneOf::Left(true)),
+        definition_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })
     .unwrap();
@@ -45,20 +49,23 @@ fn main_loop(
                 }
                 eprintln!("got request: {req:?}");
 
-                match cast::<Completion>(req) {
-                    Ok((id, params)) => {
-                        eprintln!("got completion request #{id}: {params:?}");
-
-                        let mut items = Vec::new();
-
-                        items.push(lsp_types::CompletionItem {
-                            label: "hello".to_string(),
-                            kind: Some(CompletionItemKind::SNIPPET),
-                            insert_text: Some("Hello".to_string()),
-                            ..Default::default()
-                        });
-
+                match req.method.as_str() {
+                    Completion::METHOD => {
+                        let items = date::get_items();
                         let result = Some(CompletionResponse::Array(items));
+                        let result = serde_json::to_value(&result).unwrap();
+                        let resp = Response {
+                            id: req.id,
+                            result: Some(result),
+                            error: None,
+                        };
+                        connection.sender.send(Message::Response(resp))?;
+                        continue;
+                    }
+                    GotoDefinition::METHOD => {
+                        let (id, params) = cast::<GotoDefinition>(req)?;
+                        eprintln!("goto definition: {params:?}");
+                        let result = Some(GotoDefinitionResponse::Array(Vec::new()));
                         let result = serde_json::to_value(&result).unwrap();
                         let resp = Response {
                             id,
@@ -68,15 +75,27 @@ fn main_loop(
                         connection.sender.send(Message::Response(resp))?;
                         continue;
                     }
-                    Err(err @ ExtractError::JsonError { .. }) => panic!("{err:?}"),
-                    Err(ExtractError::MethodMismatch(req)) => req,
-                };
+                    _ => {
+                        let resp = Response::new_err(
+                            req.id,
+                            ErrorCode::MethodNotFound as i32,
+                            "unknown method".to_string(),
+                        );
+                        connection.sender.send(Message::Response(resp))?;
+                        continue;
+                    }
+                }
             }
             Message::Response(resp) => {
                 eprintln!("got response: {resp:?}");
             }
             Message::Notification(not) => {
                 eprintln!("got notification: {not:?}");
+
+                match not.method.as_str() {
+                    DidOpenTextDocument::METHOD => {}
+                    _ => {}
+                }
             }
         }
     }

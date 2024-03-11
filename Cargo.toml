@@ -10,6 +10,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.33"
 log = "0.4.20"
 lsp-server = "0.7.5"
 lsp-types = "0.95.0"

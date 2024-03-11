@@ -9,10 +9,16 @@
 
 - Current file words
 - Snippets (can use from vscode)
+- Snippets from templates
 - Knowledge base features (journal, go to)
-- Commands
-  - /today
-  - /tomorrow
+- Snippets
+  - today
+  - tomorrow
+  - yesterday
+  - 1-7days-ago
+  - 1-7days-from-now
+  - this-monday...
+  - next-monday...
 
 ## Installation
 
